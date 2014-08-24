@@ -30,3 +30,32 @@ class mount(object):
         
         subprocess.check_output(["umount", self._directory])
         os.rmdir(self._directory)
+
+class losetup(object):
+    """ Context manager mounting an un-mounting an image on a loop device. The size and
+        offset of the partition in the image are automatically computed using parted.
+    """
+
+    def __init__(self, image):
+        self.image = image
+    
+    def __enter__(self):
+        offset, size = self._get_offset_and_size()
+        loop = subprocess.check_output(["losetup", "-f", self.image, 
+            "--offset", offset, "--sizelimit", size, 
+            "--show"])
+        self.loop = loop.strip()
+        return self.loop
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        subprocess.check_output(["losetup", "-d", self.loop])
+    
+    def _get_offset_and_size(self):
+        offset, size = None, None
+        data = subprocess.check_output(["parted", self.image, "unit", "B", "print"])
+        for line in data.splitlines():
+            match = re.search(r"(?P<start>\d+)B\s+\d+B\s+(?P<size>\d+)B\s+hfs\+", data)
+            if match:
+                offset, size = match.groups()
+                break
+        return offset, size
