@@ -3,6 +3,46 @@ import os
 import re
 import subprocess
 
+def list_local(tmfs):
+    """ Return a dictionary keyed by computer names of backups in a Time Machine image.
+        For each computer, backup timestamps are sorted chronologically.
+    """
+    
+    entries = glob.glob(os.path.join(tmfs, "*", "????-??-??-??????"))
+    backups = {}
+    for entry in entries:
+        match = re.match(os.path.join(tmfs, 
+            r"(?P<computer>.*)/(?P<timestamp>\d{4}-\d{2}-\d{2}-\d{6})"), entry)
+        computer = match.group("computer")
+        timestamp = match.group("timestamp")
+        backups.setdefault(computer, []).append(timestamp)
+    
+    for timepoints in backups.values():
+        timepoints.sort()
+    
+    return backups
+
+def list_remote(destination, computer, extra_args=None):
+    """ Return a list of remote backups of given computer, sorted chronologically.
+    """
+    
+    command = ["rsync"]
+    command.append(os.path.join(destination, computer, ""))
+    if extra_args:
+        command.extend(extra_args)
+    
+    entries = subprocess.check_output(command)
+    
+    backups = []
+    for entry in entries.splitlines():
+        match = re.match(r".* (.{4}-.{2}-.{2}-.{6})$", entry)
+        if match:
+            backups.append(match.group(1))
+    
+    backups.sort()
+    
+    return backups
+
 def backup(source_root, computer, timestamp, previous_timestamp, destination_root, extra_args=None):
     """ Perform a remote rsync backup of a Time Machine snapshot.
     
