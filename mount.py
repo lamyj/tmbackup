@@ -1,4 +1,6 @@
+import contextlib
 import os
+import re
 import subprocess
 import tempfile
 
@@ -59,3 +61,15 @@ class losetup(object):
                 offset, size = match.groups()
                 break
         return offset, size
+
+@contextlib.contextmanager
+def mount_tmfs(sparsebundle):
+    """ Context manager mounting a Time Machine image on a temporary directory. The
+        temporary directory is deleted when the context manager exits.
+    """
+    
+    with mount(sparsebundle, "sparsebundlefs") as dmg:
+        with losetup(os.path.join(dmg, "sparsebundle.dmg")) as loop:
+            with mount(loop, "mount", "-t", "hfsplus") as disk:
+                with mount(disk, "tmfs") as tmfs:
+                    yield tmfs
