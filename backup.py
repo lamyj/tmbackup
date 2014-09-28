@@ -2,6 +2,7 @@ import glob
 import os
 import re
 import subprocess
+import tempfile
 
 def list_local(tmfs):
     """ Return a dictionary keyed by computer names of backups in a Time Machine image.
@@ -85,14 +86,36 @@ def backup(source_root, computer, timestamp, previous_timestamp, destination_roo
     
     subprocess.check_call(command)
 
-def cleanup(source, computer, destination):
+def delete(destination_root, computer, timestamp, extra_args=None):
     """ Remove the snapshots on the destination URL that are missing from the source
         Time Machine volume.
         
-        * ``source``: source directory of the mounted Time Machine volume
+        * ``destination_root``: destination URL of rsync.
         * ``computer``: target computer backup inside the Time Machine Volume
-        * ``destination``: destination URL of rsync. The computer directory must be 
-          present at the URL.
+        * ``timestamp``: timestamp to backup in the Time Machine format
+        * ``extra_args``: extra arguments to be passed to rsync, specified as a list
     """
     
-    pass
+    empty = tempfile.mkdtemp()
+    
+    delete_options = ["--recursive", "--delete"]
+    if extra_args:
+        delete_options.extend(extra_args)
+    
+    command = ["rsync"]
+    command.extend(delete_options)
+    
+    # Both the base directory and its sub-directories must be included. We could get
+    # away with including "timestamp**", but this might match extra directories.
+    command.append("--include={0}".format(timestamp))
+    command.append("--include={0}/**".format(timestamp))
+    command.append("--exclude=*")
+    
+    # Make sure there is a "/" at the end
+    command.append(os.path.join(empty, ""))
+    command.append(os.path.join(destination_root, computer))
+    
+    try:
+        subprocess.check_output(command)
+    finally:
+        os.rmdir(empty)
