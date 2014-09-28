@@ -1,0 +1,78 @@
+#! /usr/bin/env python
+
+import argparse
+import glob
+import os
+import re
+import shlex
+import subprocess
+import sys
+
+import backup
+import mount
+
+def main():
+    parser = argparse.ArgumentParser(description="Remote backup of a Time Machine image")
+    
+    parser.add_argument("sparsebundle", 
+        metavar="SOURCE", help="Path to the Time Machine sparsebundle")
+    parser.add_argument("destination", 
+        metavar="DESTINATION", help="Remote backup path")
+    
+    parser.add_argument("--rsync-args", 
+        metavar="RSYNC_OPTIONS", help="Arguments passed to each rsync call")
+    parser.add_argument("--verbose", "-v", action="store_true",
+        help="Display progress information")
+    
+    arguments = parser.parse_args()
+    arguments.rsync_args = shlex.split(arguments.rsync_args)
+    
+    # Make sure we have all the necessary programs
+    paths = [
+        x for x in 
+        (os.path.defpath+os.environ["PATH"]).split(os.pathsep)
+        if x]
+    missing = []
+    for program in ["losetup", "parted", "sparsebundlefs", "tmfs"]:
+        if not any(os.path.isfile(os.path.join(x, program)) for x in paths):
+            missing.append(program)
+    if missing:
+        parser.error("The following programs could not be found: {}".format(
+            ", ".join(missing)))
+    
+    try:
+        with mount.mount_tmfs(arguments.sparsebundle) as tmfs:
+            local_backups = backup.list_local(tmfs)
+        
+            remote_backups = {}
+            for computer in local_backups:            
+                remote_backups[computer] = backup.list_remote(
+                    arguments.destination, computer, arguments.rsync_args)
+        
+            for computer, backups in local_backups.items():
+            
+                previous = None
+            
+                for timestamp in backups:
+                    if timestamp not in remote_backups.get(computer, []):
+                        if arguments.verbose:
+                            print "Backing up {} based on {}".format(timestamp, previous)
+                        backup.backup(tmfs, computer, timestamp, previous, 
+                            arguments.destination, arguments.rsync_args)
+                
+                    previous = timestamp
+        
+                for timestamp in remote_backups.get(computer, []):
+                    if timestamp not in backups:
+                        if arguments.verbose:
+                            print "Deleting {}".format(timestamp)
+                        backup.delete(
+                            arguments.destination, computer, timestamp, arguments.rsync_args)
+    except Exception, e:
+        print "Could not mount Time Machine image: {}".format(e)
+        return 1
+
+    return 0
+
+if __name__ == "__main__":
+    exit(main())
