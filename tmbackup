@@ -40,6 +40,8 @@ def main():
         metavar="RSYNC_OPTIONS", help="Arguments passed to each rsync call")
     parser.add_argument("--verbose", "-v", action="store_true",
         help="Display progress information")
+    parser.add_argument("--dry-run", "-n", action="store_true",
+        help="Perform a trial run with no changes made") 
     
     arguments = parser.parse_args()
     arguments.rsync_args = shlex.split(arguments.rsync_args)
@@ -74,8 +76,9 @@ def main():
                     if timestamp not in remote_backups.get(computer, []):
                         if arguments.verbose:
                             print "Backing up {} based on {}".format(timestamp, previous)
-                        backup.backup(tmfs, computer, timestamp, previous, 
-                            arguments.destination, arguments.rsync_args)
+                        if not arguments.dry_run:
+                            backup.backup(tmfs, computer, timestamp, previous, 
+                                arguments.destination, arguments.rsync_args)
                 
                     previous = timestamp
         
@@ -83,8 +86,9 @@ def main():
                     if timestamp not in backups:
                         if arguments.verbose:
                             print "Deleting {}".format(timestamp)
-                        backup.delete(
-                            arguments.destination, computer, timestamp, arguments.rsync_args)
+                        if not arguments.dry_run:
+                            backup.delete(arguments.destination, computer, timestamp, 
+                                arguments.rsync_args)
     except Exception, e:
         print "Could not mount Time Machine image: {}".format(e)
         return 1
