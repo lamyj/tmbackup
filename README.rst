@@ -9,6 +9,7 @@ Installation
 ------------
 
 Apart from the files in this project, you'll need:
+
 * Python
 * rsync
 * `sparsebundlefs <https://github.com/torarnv/sparsebundlefs>`_
@@ -21,9 +22,11 @@ Usage
 Basic usage is:
 
 .. code-block:: bash
+
     tmbackup /somewhere/computer.sparsebundle/ user@backup.example.com:/home/user
 
 You can also pass ``rsync`` options, e.g. authentication information:
 
 .. code-block:: bash
+
     tmbackup --rsync-args="--password-file=/somewhere/backup.passwd" /somewhere/computer.sparsebundle/ rsync://user@backup.example.com/home/user
