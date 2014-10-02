@@ -53,7 +53,7 @@ def list_remote(destination, computer, extra_args=None):
     
     backups = []
     for entry in entries.splitlines():
-        match = re.match(r".* (.{4}-.{2}-.{2}-.{6})$", entry)
+        match = re.match(r".* (.{4}-.{2}-.{2}-.{6}).done$", entry)
         if match:
             backups.append(match.group(1))
     
@@ -102,6 +102,15 @@ def backup(source_root, computer, timestamp, previous_timestamp, destination_roo
     command.extend([source, destination])
     
     subprocess.check_call(command)
+    
+    with tempfile.NamedTemporaryFile() as file_:
+        command = ["rsync", "--archive"]
+        if extra_args:
+            command.extend(extra_args)
+        command.append(file_.name)
+        command.append(os.path.join(
+            destination_root, computer, "{0}.done".format(timestamp)))
+        subprocess.check_call(command)
 
 def delete(destination_root, computer, timestamp, extra_args=None):
     """ Remove the snapshots on the destination URL that are missing from the source
@@ -126,6 +135,7 @@ def delete(destination_root, computer, timestamp, extra_args=None):
     # away with including "timestamp**", but this might match extra directories.
     command.append("--include={0}".format(timestamp))
     command.append("--include={0}/**".format(timestamp))
+    command.append("--include={0}.done".format(timestamp))
     command.append("--exclude=*")
     
     # Make sure there is a "/" at the end
