@@ -55,14 +55,15 @@ class losetup(object):
         offset of the partition in the image are automatically computed using parted.
     """
 
-    def __init__(self, image):
+    def __init__(self, image, *args):
         self.image = image
+        self.args = args
     
     def __enter__(self):
         offset, size = self._get_offset_and_size()
         loop = subprocess.check_output(["losetup", "-f", self.image, 
             "--offset", offset, "--sizelimit", size, 
-            "--show"])
+            "--show"]+list(self.args))
         self.loop = loop.strip()
         return self.loop
     
@@ -85,8 +86,8 @@ def mount_tmfs(sparsebundle):
         temporary directory is deleted when the context manager exits.
     """
     
-    with mount(sparsebundle, "sparsebundlefs") as dmg:
-        with losetup(os.path.join(dmg, "sparsebundle.dmg")) as loop:
-            with mount(loop, "mount", "-t", "hfsplus") as disk:
-                with mount(disk, "tmfs") as tmfs:
+    with mount(sparsebundle, "sparsebundlefs", "-o", "ro") as dmg:
+        with losetup(os.path.join(dmg, "sparsebundle.dmg"), "-r") as loop:
+            with mount(loop, "mount", "-t", "hfsplus", "-o", "ro") as disk:
+                with mount(disk, "tmfs", "-o", "ro") as tmfs:
                     yield tmfs
