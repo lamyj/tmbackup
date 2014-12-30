@@ -18,6 +18,7 @@
 # along with tmbackup.  If not, see <http://www.gnu.org/licenses/>. 
 
 import argparse
+import datetime
 import glob
 import os
 import re
@@ -38,6 +39,8 @@ def main():
     
     parser.add_argument("--rsync-args", 
         metavar="RSYNC_OPTIONS", help="Arguments passed to each rsync call")
+    parser.add_argument("--max-age", "-m", type=int, default=sys.maxint,
+        metavar="DAYS", help="Maximum age of backup in days")
     parser.add_argument("--verbose", "-v", action="store_true",
         help="Display progress information")
     parser.add_argument("--dry-run", "-n", action="store_true",
@@ -68,6 +71,14 @@ def main():
                 remote_backups[computer] = backup.list_remote(
                     arguments.destination, computer, arguments.rsync_args)
         
+            for computer, backups in local_backups.items():
+                dates = [datetime.datetime.strptime(x, "%Y-%m-%d-%H%M%S") for x in backups]
+                latest = max(dates)
+                deltas = [latest-x for x in dates]
+                backups[:] = [timestamp 
+                    for timestamp, delta in zip(backups, deltas) 
+                    if delta.days <= arguments.max_age]
+            
             for computer, backups in local_backups.items():
             
                 previous = None
